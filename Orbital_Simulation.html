@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newtonian Orbit vs. Precession Simulation</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --text-color: #e2e8f0;
+            --panel-bg: #1e293b;
+            --accent-blue: #38bdf8;
+            --accent-pink: #f472b6;
+            --accent-yellow: #facc15;
+            --accent-green: #4ade80;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Layout Container */
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Canvas Area */
+        .canvas-wrapper {
+            flex: 2;
+            position: relative;
+            background-color: #000;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Speed Indicator Overlay */
+        .speed-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(15, 23, 42, 0.8);
+            padding: 5px 15px;
+            border-radius: 20px;
+            border: 1px solid var(--accent-blue);
+            font-weight: bold;
+            color: var(--accent-blue);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .speed-indicator.visible {
+            opacity: 1;
+        }
+
+        /* Sidebar/Explanation Area */
+        .sidebar {
+            flex: 1;
+            padding: 2rem;
+            background-color: var(--panel-bg);
+            border-left: 1px solid #334155;
+            overflow-y: auto;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            min-width: 320px;
+            max-width: 450px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            color: #fff;
+            border-bottom: 2px solid #334155;
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+            color: #94a3b8;
+        }
+
+        p {
+            line-height: 1.6;
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+            color: #cbd5e1;
+        }
+
+        .legend {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .legend-blue .dot { background-color: var(--accent-blue); box-shadow: 0 0 8px var(--accent-blue); }
+        .legend-pink .dot { background-color: var(--accent-pink); box-shadow: 0 0 8px var(--accent-pink); }
+        .legend-yellow .dot { background-color: var(--accent-yellow); box-shadow: 0 0 15px var(--accent-yellow); }
+
+        .controls {
+            margin-top: auto;
+            padding-top: 1rem;
+            border-top: 1px solid #334155;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        /* Full width for the restart button */
+        .controls button:first-child {
+            grid-column: span 2;
+        }
+
+        button {
+            background-color: var(--accent-blue);
+            color: #0f172a;
+            border: none;
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+
+        button:hover {
+            background-color: #0ea5e9;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background-color: transparent;
+            border: 1px solid var(--accent-blue);
+            color: var(--accent-blue);
+        }
+        
+        button.secondary:hover {
+            background-color: rgba(56, 189, 248, 0.1);
+        }
+
+        /* Speed button specific styling */
+        button.speed-btn {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--accent-green);
+            color: var(--accent-green);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        button.speed-btn:hover {
+            background-color: rgba(74, 222, 128, 0.1);
+        }
+        
+        button.speed-btn span.icon {
+            font-size: 1.1em;
+        }
+
+        .math-block {
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            border-left: 3px solid var(--accent-blue);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            body { flex-direction: column; overflow: auto; }
+            .container { flex-direction: column; }
+            .canvas-wrapper { height: 50vh; flex: none; }
+            .sidebar { width: auto; max-width: none; flex: none; min-width: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="canvas-wrapper">
+        <canvas id="simCanvas"></canvas>
+        <div id="speedIndicator" class="speed-indicator">Speed: 1x</div>
+    </div>
+
+    <aside class="sidebar">
+        <div>
+            <h1>Orbital Dynamics</h1>
+            <p>A visual comparison between a classic Newtonian closed orbit and a precessing "rosette" orbit starting from the <strong>same initial conditions</strong>.</p>
+        </div>
+
+        <div>
+            <div class="legend legend-yellow">
+                <span class="dot"></span> The Sun (Center of Mass)
+            </div>
+            <p>Stationary massive body providing the gravitational field.</p>
+            
+            <div class="legend legend-blue">
+                <span class="dot"></span> Planet 1: Closed Orbit
+            </div>
+            <p>
+                Follows the standard inverse-square law: 
+                <div class="math-block">F = G * M * m / r²</div>
+            </p>
+            <p>
+                In a perfect two-body Newtonian system, orbits are closed ellipses. The planet returns to the exact same point in space after every revolution.
+            </p>
+
+            <div class="legend legend-pink">
+                <span class="dot"></span> Planet 2: Rosette Orbit
+            </div>
+            <p>
+                Follows a perturbed force law:
+                <div class="math-block">F = (G * M * m / r²) + (C / r³)</div>
+            </p>
+            <p>
+                Because of the extra term ($1/r^3$), Planet 2 feels a slightly stronger pull when close to the sun. This causes its "perihelion" (closest point) to shift slightly with every orbit, creating the rosette pattern.
+            </p>
+        </div>
+
+        <div class="controls">
+            <button onclick="resetSimulation()">Restart Simulation</button>
+            <button class="secondary" onclick="toggleTrails()">Toggle Trails</button>
+            <button class="speed-btn" id="speedBtn" onclick="toggleSpeed()">
+                <span>Speed</span>
+                <span id="speedLabel">1x</span>
+            </button>
+        </div>
+    </aside>
+</div>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    const speedLabel = document.getElementById('speedLabel');
+    const speedIndicator = document.getElementById('speedIndicator');
+
+    // Physics Constants
+    const G = 1; // Gravitational constant (scaled for visual)
+    const SUN_MASS = 2000;
+    
+    // State
+    let width, height, centerX, centerY;
+    let animationId;
+    let showTrails = true;
+    let timeStepsPerFrame = 1; // 1 = Normal speed
+    const speeds = [1, 2, 5, 10]; // Available speed multipliers
+
+    // Entity Classes
+    class Body {
+        constructor(x, y, vx, vy, color, radius) {
+            this.x = x;
+            this.y = y;
+            this.vx = vx;
+            this.vy = vy;
+            this.color = color;
+            this.radius = radius;
+            this.path = [];
+            this.maxPath = 1500; // Increased trail length slightly
+        }
+
+        updatePos() {
+            this.x += this.vx;
+            this.y += this.vy;
+            
+            // Only add to trail every X frames to save performance/memory
+            // but keep it frequent enough to look smooth
+            if (showTrails) {
+                // Determine trail resolution based on speed to avoid gaps
+                // or too much density
+                this.path.push({x: this.x, y: this.y});
+                if (this.path.length > this.maxPath) {
+                    this.path.shift();
+                }
+            } else {
+                this.path = [];
+            }
+        }
+
+        draw(ctx) {
+            // Draw Trail
+            if (this.path.length > 1 && showTrails) {
+                ctx.beginPath();
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 2;
+                // Fade out trail
+                // We draw the trail as one continuous line for performance, 
+                // but use gradient or segments for alpha if needed. 
+                // Simple globalAlpha works best for performance.
+                ctx.globalAlpha = 0.5; 
+                ctx.moveTo(this.path[0].x, this.path[0].y);
+                for(let i = 1; i < this.path.length; i++) {
+                    ctx.lineTo(this.path[i].x, this.path[i].y);
+                }
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+            }
+
+            // Draw Body
+            ctx.beginPath();
+            ctx.fillStyle = this.color;
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Glow effect
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = this.color;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    let sun, planet1, planet2;
+
+    function init() {
+        resize();
+        
+        sun = { x: centerX, y: centerY, mass: SUN_MASS, radius: 40, color: '#facc15' };
+        
+        // Both planets now start at the exact same radius and velocity
+        const startRadius = 400;
+        
+        // Calculate velocity for an elliptical orbit (0.8 of circular velocity)
+        const vStart = Math.sqrt((G * SUN_MASS) / startRadius) * 0.8;
+
+        // Planet 1 Setup (Standard Ellipse)
+        planet1 = new Body(centerX + startRadius, centerY, 0, vStart, '#38bdf8', 10);
+        
+        // Planet 2 Setup (Rosette)
+        planet2 = new Body(centerX + startRadius, centerY, 0, vStart, '#f472b6', 10);
+        
+        // Adjust max path for high speeds so we don't lose the rosette visual
+        planet2.maxPath = 15000; 
+    }
+
+    function updatePhysics() {
+        // --- Planet 1: Standard Newtonian Gravity ---
+        let dx1 = sun.x - planet1.x;
+        let dy1 = sun.y - planet1.y;
+        let dist1 = Math.sqrt(dx1*dx1 + dy1*dy1);
+        
+        // F = GM/r^2
+        let force1 = (G * sun.mass) / (dist1 * dist1);
+        
+        let ax1 = force1 * (dx1 / dist1);
+        let ay1 = force1 * (dy1 / dist1);
+        
+        planet1.vx += ax1;
+        planet1.vy += ay1;
+        planet1.updatePos();
+
+        // --- Planet 2: Perturbed Gravity (Rosette) ---
+        let dx2 = sun.x - planet2.x;
+        let dy2 = sun.y - planet2.y;
+        let dist2 = Math.sqrt(dx2*dx2 + dy2*dy2);
+        
+        // Newtonian Term: GM/r^2
+        let newtonTerm = (G * sun.mass) / (dist2 * dist2);
+        
+        // Perturbation Term: C/r^3
+        // This causes the orbit to precess (perihelion shift)
+        const perturbationStrength = 45000; 
+        let perturbTerm = perturbationStrength / (dist2 * dist2 * dist2);
+        
+        let totalForce = newtonTerm + perturbTerm;
+        
+        let ax2 = totalForce * (dx2 / dist2);
+        let ay2 = totalForce * (dy2 / dist2);
+
+        planet2.vx += ax2;
+        planet2.vy += ay2;
+        planet2.updatePos();
+    }
+
+    function draw() {
+        // Clear background
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, width, height);
+
+        // Draw Sun
+        ctx.beginPath();
+        ctx.fillStyle = sun.color;
+        ctx.arc(sun.x, sun.y, sun.radius, 0, Math.PI * 2);
+        ctx.shadowBlur = 40;
+        ctx.shadowColor = sun.color;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        planet1.draw(ctx);
+        planet2.draw(ctx);
+    }
+
+    function loop() {
+        // SPEED LOGIC:
+        // Instead of increasing the Delta Time (dt) which would make physics unstable,
+        // we simply run the physics update multiple times per frame.
+        for(let i = 0; i < timeStepsPerFrame; i++) {
+            updatePhysics();
+        }
+
+        draw();
+        animationId = requestAnimationFrame(loop);
+    }
+
+    function resize() {
+        width = document.querySelector('.canvas-wrapper').clientWidth;
+        height = document.querySelector('.canvas-wrapper').clientHeight;
+        canvas.width = width;
+        canvas.height = height;
+        centerX = width / 2;
+        centerY = height / 2;
+        
+        // If resizing mid-sim, re-center sun
+        if(sun) {
+            const dx = centerX - sun.x;
+            const dy = centerY - sun.y;
+            sun.x = centerX;
+            sun.y = centerY;
+            // Shift planets relative to new center
+            if(planet1) { planet1.x += dx; planet1.y += dy; planet1.path = []; }
+            if(planet2) { planet2.x += dx; planet2.y += dy; planet2.path = []; }
+        }
+    }
+
+    function resetSimulation() {
+        cancelAnimationFrame(animationId);
+        // Reset speed to 1x on full reset? Optional, keeping current speed is usually better UX.
+        init();
+        loop();
+    }
+
+    function toggleTrails() {
+        showTrails = !showTrails;
+        if(!showTrails) {
+            planet1.path = [];
+            planet2.path = [];
+        }
+    }
+
+    function toggleSpeed() {
+        // Find current index
+        let currentIndex = speeds.indexOf(timeStepsPerFrame);
+        // Next index, wrapping around
+        let nextIndex = (currentIndex + 1) % speeds.length;
+        
+        timeStepsPerFrame = speeds[nextIndex];
+        
+        // Update UI
+        speedLabel.textContent = timeStepsPerFrame + 'x';
+        
+        // Flash indicator on canvas
+        speedIndicator.textContent = `Speed: ${timeStepsPerFrame}x`;
+        speedIndicator.classList.add('visible');
+        
+        // Reset animation for fade out
+        // Clear existing timeout if user clicks fast
+        if (this.fadeTimeout) clearTimeout(this.fadeTimeout);
+        this.fadeTimeout = setTimeout(() => {
+            speedIndicator.classList.remove('visible');
+        }, 1000);
+    }
+
+    // Event Listeners
+    window.addEventListener('resize', resize);
+    
+    // Start
+    init();
+    loop();
+
+</script>
+</body>
+</html>
