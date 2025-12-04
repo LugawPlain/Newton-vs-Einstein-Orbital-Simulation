@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Newton vs Einstein: Orbital Simulation with Post-Newtonian Correction</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Newton vs Einstein: Orbital Simulation</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -15,30 +15,37 @@
             --accent-green: #4ade80;
         }
 
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
         body {
             margin: 0;
             padding: 0;
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-color);
-            display: flex;
             height: 100vh;
-            overflow: hidden;
+            width: 100vw;
+            overflow: hidden; /* Prevent body scroll, handle inside containers */
         }
 
         /* Layout Container */
         .container {
             display: flex;
+            flex-direction: row;
             width: 100%;
             height: 100%;
         }
 
         /* Canvas Area */
         .canvas-wrapper {
-            flex: 2;
+            flex: 1; /* Takes remaining space */
             position: relative;
             background-color: #000;
             overflow: hidden;
+            order: 1; /* Canvas on left/top */
         }
 
         canvas {
@@ -52,53 +59,52 @@
             position: absolute;
             top: 20px;
             right: 20px;
-            background: rgba(15, 23, 42, 0.8);
-            padding: 5px 15px;
+            background: rgba(15, 23, 42, 0.9);
+            padding: 8px 16px;
             border-radius: 20px;
             border: 1px solid var(--accent-blue);
             font-weight: bold;
+            font-size: 0.9rem;
             color: var(--accent-blue);
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.3s;
+            z-index: 10;
         }
         
-        .speed-indicator.visible {
-            opacity: 1;
-        }
+        .speed-indicator.visible { opacity: 1; }
 
         /* Sidebar/Explanation Area */
         .sidebar {
-            flex: 1;
-            padding: 2rem;
+            width: 400px;
+            min-width: 300px;
             background-color: var(--panel-bg);
             border-left: 1px solid #334155;
-            overflow-y: auto;
-            box-shadow: -5px 0 15px rgba(0,0,0,0.3);
             display: flex;
             flex-direction: column;
-            gap: 1.5rem;
-            min-width: 320px;
-            max-width: 450px;
+            order: 2;
+            z-index: 5;
+            box-shadow: -5px 0 20px rgba(0,0,0,0.5);
+        }
+
+        .scroll-content {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
         }
 
         h1 {
-            font-size: 1.5rem;
-            margin: 0;
+            font-size: 1.25rem;
+            margin: 0 0 1rem 0;
             color: #fff;
             border-bottom: 2px solid #334155;
             padding-bottom: 0.5rem;
-        }
-
-        h2 {
-            font-size: 1.1rem;
-            margin-bottom: 0.5rem;
-            color: #94a3b8;
+            line-height: 1.3;
         }
 
         p {
-            line-height: 1.6;
-            font-size: 0.95rem;
+            line-height: 1.5;
+            font-size: 0.9rem;
             margin-bottom: 1rem;
             color: #cbd5e1;
         }
@@ -108,14 +114,17 @@
             align-items: center;
             gap: 0.5rem;
             font-weight: bold;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+            margin-bottom: 0.25rem;
         }
 
         .dot {
-            width: 12px;
-            height: 12px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             display: inline-block;
+            flex-shrink: 0;
         }
 
         .legend-blue .dot { background-color: var(--accent-blue); box-shadow: 0 0 8px var(--accent-blue); }
@@ -123,39 +132,30 @@
         .legend-yellow .dot { background-color: var(--accent-yellow); box-shadow: 0 0 15px var(--accent-yellow); }
 
         .controls {
-            margin-top: auto;
-            padding-top: 1rem;
+            padding: 1rem;
             border-top: 1px solid #334155;
+            background-color: rgba(30, 41, 59, 0.95);
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 10px;
         }
 
-        /* Full width for the restart button */
-        .controls button:first-child {
-            grid-column: span 2;
-        }
+        .controls button:first-child { grid-column: span 2; }
 
         button {
             background-color: var(--accent-blue);
             color: #0f172a;
             border: none;
-            padding: 0.75rem 1rem;
-            border-radius: 6px;
-            font-weight: bold;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 700;
             cursor: pointer;
             transition: all 0.2s;
             font-size: 0.9rem;
+            touch-action: manipulation; /* Improves touch response */
         }
 
-        button:hover {
-            background-color: #0ea5e9;
-            transform: translateY(-1px);
-        }
-
-        button:active {
-            transform: translateY(0);
-        }
+        button:active { transform: scale(0.98); }
 
         button.secondary {
             background-color: transparent;
@@ -163,13 +163,10 @@
             color: var(--accent-blue);
         }
         
-        button.secondary:hover {
-            background-color: rgba(56, 189, 248, 0.1);
-        }
+        button.secondary:active { background-color: rgba(56, 189, 248, 0.1); }
 
-        /* Speed button specific styling */
         button.speed-btn {
-            background-color: var(--panel-bg);
+            background-color: rgba(15, 23, 42, 0.5);
             border: 1px solid var(--accent-green);
             color: var(--accent-green);
             display: flex;
@@ -177,29 +174,63 @@
             align-items: center;
         }
 
-        button.speed-btn:hover {
-            background-color: rgba(74, 222, 128, 0.1);
-        }
-        
-        button.speed-btn span.icon {
-            font-size: 1.1em;
-        }
-
         .math-block {
             background: #0f172a;
-            padding: 10px;
+            padding: 8px;
             border-radius: 4px;
             font-family: 'Courier New', monospace;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             border-left: 3px solid var(--accent-blue);
+            margin-bottom: 10px;
+            white-space: nowrap;
+            overflow-x: auto; /* Scroll math on small screens */
         }
 
-        /* Mobile Responsive */
-        @media (max-width: 768px) {
-            body { flex-direction: column; overflow: auto; }
-            .container { flex-direction: column; }
-            .canvas-wrapper { height: 50vh; flex: none; }
-            .sidebar { width: auto; max-width: none; flex: none; min-width: 0; }
+        /* --- RESPONSIVE BREAKPOINTS --- */
+        
+        /* Tablets and Large Phones */
+        @media (max-width: 900px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .canvas-wrapper {
+                height: 55vh; /* Fixed height for canvas */
+                flex: none;
+                order: 1;
+            }
+
+            .sidebar {
+                width: 100%;
+                height: 45vh; /* Remaining height */
+                border-left: none;
+                border-top: 1px solid #334155;
+                order: 2;
+                min-width: 0;
+            }
+        }
+
+        /* Small Phones (Portrait) */
+        @media (max-width: 600px) {
+            .canvas-wrapper {
+                height: 50vh;
+            }
+            .sidebar {
+                height: 50vh;
+            }
+            .scroll-content {
+                padding: 1rem;
+            }
+            h1 { font-size: 1.1rem; }
+            button { padding: 10px; font-size: 0.85rem; }
+        }
+
+        /* Landscape Mode on Phones */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .container { flex-direction: row; }
+            .canvas-wrapper { height: 100%; flex: 1; }
+            .sidebar { width: 320px; height: 100%; overflow-y: auto; }
+            .controls { position: sticky; bottom: 0; }
         }
     </style>
 </head>
@@ -212,37 +243,28 @@
     </div>
 
     <aside class="sidebar">
-        <div>
-            <h1>Newton vs Einstein: Orbital Simulation with Post-Newtonian Correction</h1>
-            <p>A visual comparison between a classic Newtonian closed orbit and a precessing "rosette" orbit following Einstein's General Relativity starting from the <strong>same initial conditions</strong>.</p>
-        </div>
+        <div class="scroll-content">
+            <h1>Newton vs Einstein: Orbital Precession</h1>
+            <p>A visual comparison between a classic Newtonian closed orbit and a precessing "rosette" orbit following General Relativity.</p>
 
-        <div>
             <div class="legend legend-yellow">
-                <span class="dot"></span> The Sun (Center of Mass)
+                <span class="dot"></span> The Sun
             </div>
-            <p>Stationary massive body providing the gravitational field.</p>
             
             <div class="legend legend-blue">
                 <span class="dot"></span> Planet 1: Closed Orbit
             </div>
-            <p>
-                Follows the standard inverse-square law: 
-                <div class="math-block">F = G * M * m / r²</div>
-            </p>
-            <p>
-                In a perfect two-body Newtonian system, orbits are closed ellipses. The planet returns to the exact same point in space after every revolution.
-            </p>
+            <p style="margin-bottom: 0;">Follows standard inverse-square law:</p>
+            <div class="math-block">F = G * M * m / r²</div>
+            <p>Orbits are perfect ellipses and retrace their path indefinitely.</p>
 
             <div class="legend legend-pink">
                 <span class="dot"></span> Planet 2: Rosette Orbit
             </div>
+            <p style="margin-bottom: 0;">Includes Post-Newtonian term:</p>
+            <div class="math-block">F = (G*M*m/r²) + (C/r³)</div>
             <p>
-                Follows a perturbed force law:
-                <div class="math-block">F = (G * M * m / r²) + (C / r³)</div>
-            </p>
-            <p>
-                Because of the extra term (C /r^3 ), Planet 2 feels a slightly stronger pull when close to the sun. This causes its "perihelion" (closest point) to shift slightly with every orbit, creating the rosette pattern.
+                The extra term causes the "perihelion" (closest point) to shift slightly with every orbit, creating the flower pattern.
             </p>
         </div>
 
@@ -262,17 +284,23 @@
     const ctx = canvas.getContext('2d');
     const speedLabel = document.getElementById('speedLabel');
     const speedIndicator = document.getElementById('speedIndicator');
+    const wrapper = document.querySelector('.canvas-wrapper');
 
     // Physics Constants
-    const G = 1; // Gravitational constant (scaled for visual)
+    const G = 1; 
     const SUN_MASS = 2000;
     
     // State
     let width, height, centerX, centerY;
     let animationId;
     let showTrails = true;
-    let timeStepsPerFrame = 1; // 1 = Normal speed
-    const speeds = [1, 2, 5, 10]; // Available speed multipliers
+    let timeStepsPerFrame = 1; 
+    const speeds = [1, 2, 5, 10]; 
+
+    // Helper for High DPI screens
+    function getDPR() {
+        return window.devicePixelRatio || 1;
+    }
 
     // Entity Classes
     class Body {
@@ -284,21 +312,24 @@
             this.color = color;
             this.radius = radius;
             this.path = [];
-            this.maxPath = 1500; // Increased trail length slightly
+            this.maxPath = 1500; 
         }
 
         updatePos() {
             this.x += this.vx;
             this.y += this.vy;
             
-            // Only add to trail every X frames to save performance/memory
-            // but keep it frequent enough to look smooth
             if (showTrails) {
-                // Determine trail resolution based on speed to avoid gaps
-                // or too much density
-                this.path.push({x: this.x, y: this.y});
-                if (this.path.length > this.maxPath) {
-                    this.path.shift();
+                // Optimize: only save trail point if distance moved is significant enough
+                // This prevents trail bunching at low speeds
+                if(this.path.length === 0 || 
+                   Math.abs(this.x - this.path[this.path.length-1].x) > 2 || 
+                   Math.abs(this.y - this.path[this.path.length-1].y) > 2) {
+                    
+                    this.path.push({x: this.x, y: this.y});
+                    if (this.path.length > this.maxPath) {
+                        this.path.shift();
+                    }
                 }
             } else {
                 this.path = [];
@@ -311,10 +342,6 @@
                 ctx.beginPath();
                 ctx.strokeStyle = this.color;
                 ctx.lineWidth = 2;
-                // Fade out trail
-                // We draw the trail as one continuous line for performance, 
-                // but use gradient or segments for alpha if needed. 
-                // Simple globalAlpha works best for performance.
                 ctx.globalAlpha = 0.5; 
                 ctx.moveTo(this.path[0].x, this.path[0].y);
                 for(let i = 1; i < this.path.length; i++) {
@@ -341,67 +368,53 @@
     let sun, planet1, planet2;
 
     function init() {
-        resize();
+        // resize() is called before this in setup, 
+        // but we ensure logic is clean here
         
-        sun = { x: centerX, y: centerY, mass: SUN_MASS, radius: 40, color: '#facc15' };
+        sun = { x: centerX, y: centerY, mass: SUN_MASS, radius: 25, color: '#facc15' };
         
-        // Both planets now start at the exact same radius and velocity
-        const startRadius = 400;
+        // Responsive orbit size: smaller on mobile
+        const minDim = Math.min(width, height);
+        const startRadius = minDim * 0.35; // 35% of screen dimension
         
-        // Calculate velocity for an elliptical orbit (0.8 of circular velocity)
         const vStart = Math.sqrt((G * SUN_MASS) / startRadius) * 0.8;
 
-        // Planet 1 Setup (Standard Ellipse)
-        planet1 = new Body(centerX + startRadius, centerY, 0, vStart, '#38bdf8', 10);
-        
-        // Planet 2 Setup (Rosette)
-        planet2 = new Body(centerX + startRadius, centerY, 0, vStart, '#f472b6', 10);
-        
-        // Adjust max path for high speeds so we don't lose the rosette visual
+        planet1 = new Body(centerX + startRadius, centerY, 0, vStart, '#38bdf8', 8);
+        planet2 = new Body(centerX + startRadius, centerY, 0, vStart, '#f472b6', 8);
         planet2.maxPath = 15000; 
     }
 
     function updatePhysics() {
-        // --- Planet 1: Standard Newtonian Gravity ---
+        // Planet 1 (Newton)
         let dx1 = sun.x - planet1.x;
         let dy1 = sun.y - planet1.y;
         let dist1 = Math.sqrt(dx1*dx1 + dy1*dy1);
-        
-        // F = GM/r^2
         let force1 = (G * sun.mass) / (dist1 * dist1);
-        
         let ax1 = force1 * (dx1 / dist1);
         let ay1 = force1 * (dy1 / dist1);
-        
         planet1.vx += ax1;
         planet1.vy += ay1;
         planet1.updatePos();
 
-        // --- Planet 2: Perturbed Gravity (Rosette) ---
+        // Planet 2 (Einstein/Perturbed)
         let dx2 = sun.x - planet2.x;
         let dy2 = sun.y - planet2.y;
         let dist2 = Math.sqrt(dx2*dx2 + dy2*dy2);
-        
-        // Newtonian Term: GM/r^2
         let newtonTerm = (G * sun.mass) / (dist2 * dist2);
         
-        // Perturbation Term: C/r^3
-        // This causes the orbit to precess (perihelion shift)
+        // Scale perturbation based on radius so effect looks similar on mobile/desktop
         const perturbationStrength = 45000; 
         let perturbTerm = perturbationStrength / (dist2 * dist2 * dist2);
         
         let totalForce = newtonTerm + perturbTerm;
-        
         let ax2 = totalForce * (dx2 / dist2);
         let ay2 = totalForce * (dy2 / dist2);
-
         planet2.vx += ax2;
         planet2.vy += ay2;
         planet2.updatePos();
     }
 
     function draw() {
-        // Clear background
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, width, height);
 
@@ -409,7 +422,7 @@
         ctx.beginPath();
         ctx.fillStyle = sun.color;
         ctx.arc(sun.x, sun.y, sun.radius, 0, Math.PI * 2);
-        ctx.shadowBlur = 40;
+        ctx.shadowBlur = 30;
         ctx.shadowColor = sun.color;
         ctx.fill();
         ctx.shadowBlur = 0;
@@ -419,40 +432,55 @@
     }
 
     function loop() {
-        // SPEED LOGIC:
-        // Instead of increasing the Delta Time (dt) which would make physics unstable,
-        // we simply run the physics update multiple times per frame.
         for(let i = 0; i < timeStepsPerFrame; i++) {
             updatePhysics();
         }
-
         draw();
         animationId = requestAnimationFrame(loop);
     }
 
     function resize() {
-        width = document.querySelector('.canvas-wrapper').clientWidth;
-        height = document.querySelector('.canvas-wrapper').clientHeight;
-        canvas.width = width;
-        canvas.height = height;
-        centerX = width / 2;
-        centerY = height / 2;
+        const dpr = getDPR();
         
-        // If resizing mid-sim, re-center sun
+        // Get the CSS size
+        const cssWidth = wrapper.clientWidth;
+        const cssHeight = wrapper.clientHeight;
+        
+        // Set the internal size (pixels)
+        canvas.width = cssWidth * dpr;
+        canvas.height = cssHeight * dpr;
+
+        // Reset the variables used for logic to match CSS size (so physics logic doesn't need to scale)
+        width = cssWidth;
+        height = cssHeight;
+        
+        // Scale the drawing context so we can draw using CSS logic units
+        ctx.scale(dpr, dpr);
+
+        const newCenterX = width / 2;
+        const newCenterY = height / 2;
+        
+        // Relocate Sun and Shift Planets
         if(sun) {
-            const dx = centerX - sun.x;
-            const dy = centerY - sun.y;
-            sun.x = centerX;
-            sun.y = centerY;
-            // Shift planets relative to new center
+            const dx = newCenterX - sun.x;
+            const dy = newCenterY - sun.y;
+            
+            sun.x = newCenterX;
+            sun.y = newCenterY;
+            
             if(planet1) { planet1.x += dx; planet1.y += dy; planet1.path = []; }
             if(planet2) { planet2.x += dx; planet2.y += dy; planet2.path = []; }
+        } else {
+            centerX = newCenterX;
+            centerY = newCenterY;
         }
+        
+        centerX = newCenterX;
+        centerY = newCenterY;
     }
 
     function resetSimulation() {
         cancelAnimationFrame(animationId);
-        // Reset speed to 1x on full reset? Optional, keeping current speed is usually better UX.
         init();
         loop();
     }
@@ -466,32 +494,27 @@
     }
 
     function toggleSpeed() {
-        // Find current index
         let currentIndex = speeds.indexOf(timeStepsPerFrame);
-        // Next index, wrapping around
         let nextIndex = (currentIndex + 1) % speeds.length;
-        
         timeStepsPerFrame = speeds[nextIndex];
-        
-        // Update UI
         speedLabel.textContent = timeStepsPerFrame + 'x';
-        
-        // Flash indicator on canvas
         speedIndicator.textContent = `Speed: ${timeStepsPerFrame}x`;
         speedIndicator.classList.add('visible');
-        
-        // Reset animation for fade out
-        // Clear existing timeout if user clicks fast
         if (this.fadeTimeout) clearTimeout(this.fadeTimeout);
         this.fadeTimeout = setTimeout(() => {
             speedIndicator.classList.remove('visible');
         }, 1000);
     }
 
-    // Event Listeners
-    window.addEventListener('resize', resize);
+    // Debounce resize
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(resize, 100);
+    });
     
-    // Start
+    // Initial Setup
+    resize();
     init();
     loop();
 
